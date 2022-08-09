@@ -26,6 +26,7 @@ describe("escrow3", () => {
     let bobAta: anchor.web3.PublicKey
 
     let escrow: anchor.web3.PublicKey
+    let escrowBump: number
 
     let offeredEscrowTokenAccount: anchor.web3.PublicKey
     let requestedEscrowTokenAccount: anchor.web3.PublicKey
@@ -33,14 +34,14 @@ describe("escrow3", () => {
     it("request airdrops", async () => {
         const atx = await program.provider.connection.requestAirdrop(
             alice.publicKey,
-            1000000000
+            10000000000
         )
 
         await program.provider.connection.confirmTransaction(atx)
 
         const btx = await program.provider.connection.requestAirdrop(
             bob.publicKey,
-            1000000000
+            10000000000
         )
 
         await program.provider.connection.confirmTransaction(btx)
@@ -66,6 +67,14 @@ describe("escrow3", () => {
             program.programId
         )[0]
 
+        const escrowPair = await anchor.web3.PublicKey.findProgramAddressSync(
+            [Buffer.from("escrow"), aliceAta.toBuffer(), bobAta.toBuffer()],
+            program.programId
+        )
+
+        escrow = escrowPair[0]
+        escrowBump = escrowPair[1]
+
         offeredEscrowTokenAccount =
             await anchor.web3.PublicKey.findProgramAddressSync(
                 [
@@ -85,7 +94,7 @@ describe("escrow3", () => {
             )[0]
 
         const ix = await program.methods
-            .initEscrow(bobAta)
+            .initEscrow(bob.publicKey)
             .accounts({
                 offererSigner: alice.publicKey,
                 offeredTokenMint: aliceMint,
@@ -110,11 +119,18 @@ describe("escrow3", () => {
         ])
 
         await program.provider.connection.confirmTransaction(sig)
+
+        // const sss = await program.provider.connection.requestAirdrop(
+        //     escrow,
+        //     1000000000
+        // )
+
+        // await program.provider.connection.confirmTransaction(sss)
     })
 
-    it("fund escrow", async () => {
+    it("fund offered token", async () => {
         const ix = await program.methods
-            .fundEscrow()
+            .fundOfferedEscrow()
             .accounts({
                 offererSigner: alice.publicKey,
                 offeredHolderTokenAccount: aliceAta,
@@ -133,6 +149,144 @@ describe("escrow3", () => {
         const sig = await program.provider.connection.sendTransaction(tx, [
             alice,
         ])
+
+        await program.provider.connection.confirmTransaction(sig)
+    })
+
+    it("fund requested token", async () => {
+        const ix = await program.methods
+            .fundRequestedEscrow()
+            .accounts({
+                requestedSigner: bob.publicKey,
+                requestedHolderTokenAccount: bobAta,
+                newRequestedTokenAccount: requestedEscrowTokenAccount,
+                escrow: escrow,
+            })
+            .instruction()
+
+        const blockhash = await program.provider.connection.getLatestBlockhash()
+        var tx = new anchor.web3.Transaction({
+            feePayer: bob.publicKey,
+            blockhash: blockhash.blockhash,
+            lastValidBlockHeight: blockhash.lastValidBlockHeight,
+        }).add(ix)
+
+        const sig = await program.provider.connection.sendTransaction(tx, [bob])
+
+        await program.provider.connection.confirmTransaction(sig)
+    })
+
+    // it("defund offered token", async () => {
+    //     const ix = await program.methods
+    //         .defundOfferedEscrow(escrowBump)
+    //         .accounts({
+    //             offeredSigner: alice.publicKey,
+    //             escrow: escrow,
+    //             offeredHolderTokenAccount: aliceAta,
+    //             requestedHolderTokenAccount: bobAta,
+    //             newOfferedTokenAccount: offeredEscrowTokenAccount,
+    //         })
+    //         .instruction()
+
+    //     const blockhash = await program.provider.connection.getLatestBlockhash()
+    //     var tx = new anchor.web3.Transaction({
+    //         feePayer: alice.publicKey,
+    //         blockhash: blockhash.blockhash,
+    //         lastValidBlockHeight: blockhash.lastValidBlockHeight,
+    //     }).add(ix)
+
+    //     const sig = await program.provider.connection.sendTransaction(tx, [
+    //         alice,
+    //     ])
+
+    //     await program.provider.connection.confirmTransaction(sig)
+    // })
+
+    // it("defund requested token", async () => {
+    //     const ix = await program.methods
+    //         .defundRequestedEscrow(escrowBump)
+    //         .accounts({
+    //             requestedSigner: bob.publicKey,
+    //             escrow: escrow,
+    //             offeredHolderTokenAccount: aliceAta,
+    //             requestedHolderTokenAccount: bobAta,
+    //             newRequestedTokenAccount: requestedEscrowTokenAccount,
+    //         })
+    //         .instruction()
+
+    //     const blockhash = await program.provider.connection.getLatestBlockhash()
+    //     var tx = new anchor.web3.Transaction({
+    //         feePayer: bob.publicKey,
+    //         blockhash: blockhash.blockhash,
+    //         lastValidBlockHeight: blockhash.lastValidBlockHeight,
+    //     }).add(ix)
+
+    //     const sig = await program.provider.connection.sendTransaction(tx, [bob])
+
+    //     await program.provider.connection.confirmTransaction(sig)
+    // })
+
+    it("crank swap", async () => {
+        const finalAliceAta = await findAssociatedTokenAddress(
+            alice.publicKey,
+            bobMint
+        )
+
+        const finalBobAta = await findAssociatedTokenAddress(
+            bob.publicKey,
+            aliceMint
+        )
+
+        const aliceAtaInstructon =
+            await createAssociatedTokenAccountInstruction(
+                finalAliceAta,
+                alice.publicKey,
+                alice.publicKey,
+                bobMint
+            )
+
+        const bobAtaInstructon = await createAssociatedTokenAccountInstruction(
+            finalBobAta,
+            alice.publicKey,
+            bob.publicKey,
+            aliceMint
+        )
+
+        const crankInsruction = await program.methods
+            .crankSwap(escrowBump)
+            .accounts({
+                payer: alice.publicKey,
+                escrow: escrow,
+                offeredHolderTokenAccount: aliceAta,
+                requestedHolderTokenAccount: bobAta,
+                newOfferedTokenAccount: offeredEscrowTokenAccount,
+                newRequestedTokenAccount: requestedEscrowTokenAccount,
+                finalOfferedTokenAccount: finalBobAta,
+                finalRequestedTokenAccount: finalAliceAta,
+            })
+            .instruction()
+
+        // const escrowInfo = await program.provider.connection.getAccountInfo(
+        //     alice.publicKey
+        // )
+        // console.log("LAMPORTS")
+        // console.log(escrowInfo.lamports)
+
+        const blockhash = await program.provider.connection.getLatestBlockhash()
+        var tx = new anchor.web3.Transaction({
+            feePayer: alice.publicKey,
+            blockhash: blockhash.blockhash,
+            lastValidBlockHeight: blockhash.lastValidBlockHeight,
+        })
+            .add(aliceAtaInstructon)
+            .add(bobAtaInstructon)
+            .add(crankInsruction)
+
+        const sig = await program.provider.connection.sendTransaction(tx, [
+            alice,
+        ])
+
+        await program.provider.connection.confirmTransaction(sig)
     })
 })
 
