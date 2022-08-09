@@ -10,12 +10,13 @@ declare_id('Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS')
 class Escrow(Account):
     offered_pubkey: Pubkey
     requested_pubkey: Pubkey
-    offered_token_mint: TokenMint
-    requested_token_mint: TokenMint
-    offered_token_account: TokenAccount
-    requested_token_account: TokenAccount
+    offered_token_mint_pubkey: Pubkey
+    requested_token_mint_pubkey: Pubkey
+    offered_token_account_pubkey: Pubkey
+    requested_token_account_pubkey: Pubkey
 
 
+@instruction
 def init_escrow(
     # the initiater of the swap
     offerer_signer: Signer,
@@ -33,28 +34,56 @@ def init_escrow(
     escrow: Empty[Escrow],
     # the new account that the offered token will be escrowed into
     new_offered_token_account: Empty[TokenAccount],
-    # the new account that the requested token will be escrowed into
+    # # the new account that the requested token will be escrowed into
     new_requested_token_account: Empty[TokenAccount],
-    # the base 58 pubkey string of the account that holds the token the initater wants to give
-    offered_token_account_string: str,
-    # the base 58 pubkey string of the account that holds the token the initater wants to receive
-    requested_token_account_string: str,
 ):
+
     escrow = escrow.init(
         payer=offerer_signer,
-        seeds=['escrow',
-               offered_token_account_string,
-               requested_token_account_string
-               ]
+        seeds=[
+            'escrow',
+            offered_holder_token_account,
+            requested_holder_token_account,
+        ]
     )
     escrow.offered_pubkey = offerer_signer.key()
     escrow.requested_pubkey = requested_pubkey
-    escrow.offered_token_mint = offered_token_mint
-    escrow.requested_token_mint = requested_token_mint
 
-    new_offered_token_account.init(
+    new_offered_token_account = new_offered_token_account.init(
         payer=offerer_signer,
-        seeds=['token-account', escrow],
+        seeds=['escrow-offered-token-account', offered_holder_token_account],
         mint=offered_token_mint,
         authority=escrow
+    )
+
+    new_requested_token_account.init(
+        payer=offerer_signer,
+        seeds=['escrow-requested-token-account',
+               requested_holder_token_account],
+        mint=requested_token_mint,
+        authority=escrow
+    )
+
+    escrow.offered_token_mint_pubkey = offered_token_mint.key()
+    escrow.requested_token_mint_pubkey = requested_token_mint.key()
+
+    escrow.offered_token_account_pubkey = new_offered_token_account.key()
+    escrow.requested_token_account_pubkey = new_requested_token_account.key()
+
+
+@instruction
+def fund_escrow(
+    offerer_signer: Signer,
+    escrow: Escrow,
+    offered_holder_token_account: TokenAccount,
+    new_offered_token_account: TokenAccount
+):
+
+    assert escrow.offered_pubkey == offerer_signer.key(
+    ), 'This swap escrow was not iniated by you.'
+
+    offered_holder_token_account.transfer(
+        offerer_signer,
+        new_offered_token_account,
+        u64(1)
     )
