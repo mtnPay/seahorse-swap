@@ -255,7 +255,6 @@ describe("seahorseswap", () => {
         const crankInsruction = await program.methods
             .crankSwap(escrowBump)
             .accounts({
-                payer: alice.publicKey,
                 escrow: escrow,
                 offeredHolderTokenAccount: aliceAta,
                 requestedHolderTokenAccount: bobAta,
