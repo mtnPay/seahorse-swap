@@ -174,7 +174,6 @@ def defund_requested_escrow(
 
 @instruction
 def crank_swap(
-    payer: Signer,
     escrow_bump: u8,
     escrow: Escrow,
     offered_holder_token_account: TokenAccount,
