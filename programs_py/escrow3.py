@@ -156,8 +156,8 @@ def defund_requested_escrow(
     assert escrow.requested_pubkey == requested_signer.key(
     ), 'This swap escrow was not requested to you.'
 
-    # assert escrow.requested_token_account_pubkey == new_requested_token_account.key(
-    # ), 'The escrow account does not match the given account.'
+    assert escrow.requested_token_account_pubkey == new_requested_token_account.key(
+    ), 'The escrow account does not match the given account.'
 
     new_requested_token_account.transfer(
         escrow,
@@ -191,10 +191,10 @@ def crank_swap(
     ), 'The escrow account does not match the given account.'
 
     assert final_offered_token_account.authority(
-    ) == escrow.requested_pubkey, 'COME UP WITH GOOD ERROR MESSAGE'
+    ) == escrow.requested_pubkey, 'the destination token account is now owned by the requested authority'
 
     assert final_requested_token_account.authority(
-    ) == escrow.offered_pubkey, 'COME UP WITH GOOD ERROR MESSAGE'
+    ) == escrow.offered_pubkey, 'the destination token account is now owned by the offering authority'
 
     new_requested_token_account.transfer(
         escrow,
