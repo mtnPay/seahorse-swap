@@ -1,6 +1,6 @@
 import * as anchor from "@project-serum/anchor"
 import { Program } from "@project-serum/anchor"
-import { Escrow3 } from "../target/types/escrow3"
+import { Seahorseswap } from "../target/types/seahorseswap"
 import {
     MintLayout,
     TOKEN_PROGRAM_ID,
@@ -10,11 +10,11 @@ import {
 } from "@solana/spl-token"
 import { min } from "bn.js"
 
-describe("escrow3", () => {
+describe("seahorseswap", () => {
     // Configure the client to use the local cluster.
     anchor.setProvider(anchor.AnchorProvider.env())
 
-    const program = anchor.workspace.Escrow3 as Program<Escrow3>
+    const program = anchor.workspace.Seahorseswap as Program<Seahorseswap>
 
     const alice = anchor.web3.Keypair.generate()
     const bob = anchor.web3.Keypair.generate()

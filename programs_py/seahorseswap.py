@@ -1,8 +1,7 @@
-# escrow3
+# seahorseswap
 # Built with Seahorse v0.1.2
 
 from re import A
-import string
 from seahorse.prelude import *
 
 declare_id('Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS')
@@ -133,8 +132,8 @@ def fund_requested_escrow(
     assert escrow.requested_pubkey == requested_signer.key(
     ), 'This swap escrow was not requested to you.'
 
-    # assert escrow.requested_token_account_pubkey == new_requested_token_account.key(
-    # ), 'The escrow account does not match the given account.'
+    assert escrow.requested_token_account_pubkey == new_requested_token_account.key(
+    ), 'The escrow account does not match the given account.'
 
     requested_holder_token_account.transfer(
         requested_signer,

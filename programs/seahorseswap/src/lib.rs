@@ -130,6 +130,11 @@ pub fn fund_requested_escrow_handler(mut ctx: Context<FundRequestedEscrow>) -> R
         ProgramError::E002
     );
 
+    require!(
+        escrow.requested_token_account_pubkey == new_requested_token_account.key(),
+        ProgramError::E001
+    );
+
     token::transfer(
         CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
@@ -160,6 +165,11 @@ pub fn defund_requested_escrow_handler(
         ProgramError::E002
     );
 
+    require!(
+        escrow.requested_token_account_pubkey == new_requested_token_account.key(),
+        ProgramError::E001
+    );
+
     token::transfer(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
@@ -182,7 +192,6 @@ pub fn defund_requested_escrow_handler(
 }
 
 pub fn crank_swap_handler(mut ctx: Context<CrankSwap>, mut escrow_bump: u8) -> Result<()> {
-    let mut payer = &mut ctx.accounts.payer;
     let mut escrow = &mut ctx.accounts.escrow;
     let mut offered_holder_token_account = &mut ctx.accounts.offered_holder_token_account;
     let mut requested_holder_token_account = &mut ctx.accounts.requested_holder_token_account;
@@ -208,7 +217,7 @@ pub fn crank_swap_handler(mut ctx: Context<CrankSwap>, mut escrow_bump: u8) -> R
 
     require!(
         final_requested_token_account.owner == escrow.offered_pubkey,
-        ProgramError::E003
+        ProgramError::E004
     );
 
     token::transfer(
@@ -362,8 +371,6 @@ pub struct DefundRequestedEscrow<'info> {
 #[derive(Accounts)]
 pub struct CrankSwap<'info> {
     #[account(mut)]
-    pub payer: Signer<'info>,
-    #[account(mut)]
     pub escrow: Box<Account<'info, Escrow>>,
     #[account(mut)]
     pub offered_holder_token_account: Box<Account<'info, token::TokenAccount>>,
@@ -381,7 +388,7 @@ pub struct CrankSwap<'info> {
 }
 
 #[program]
-pub mod escrow3 {
+pub mod seahorseswap {
     use super::*;
 
     pub fn init_escrow(ctx: Context<InitEscrow>, requested_pubkey: Pubkey) -> Result<()> {
@@ -420,6 +427,8 @@ pub enum ProgramError {
     E001,
     #[msg("This swap escrow was not requested to you.")]
     E002,
-    #[msg("COME UP WITH GOOD ERROR MESSAGE")]
+    #[msg("the destination token account is now owned by the requested authority")]
     E003,
+    #[msg("the destination token account is now owned by the offering authority")]
+    E004,
 }
