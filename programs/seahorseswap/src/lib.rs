@@ -83,6 +83,11 @@ pub fn fund_offered_escrow_handler(mut ctx: Context<FundOfferedEscrow>) -> Resul
         ProgramError::E005
     );
 
+    require!(
+        new_offered_token_account.owner == escrow.key(),
+        ProgramError::E006
+    );
+
     token::transfer(
         CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
@@ -147,12 +152,17 @@ pub fn fund_requested_escrow_handler(mut ctx: Context<FundRequestedEscrow>) -> R
 
     require!(
         escrow.requested_pubkey == requested_signer.key(),
-        ProgramError::E006
+        ProgramError::E007
     );
 
     require!(
         escrow.requested_token_account_pubkey == new_requested_token_account.key(),
         ProgramError::E005
+    );
+
+    require!(
+        new_requested_token_account.owner == escrow.key(),
+        ProgramError::E008
     );
 
     token::transfer(
@@ -184,7 +194,7 @@ pub fn defund_requested_escrow_handler(
 
     require!(
         escrow.requested_pubkey == requested_signer.key(),
-        ProgramError::E006
+        ProgramError::E007
     );
 
     require!(
@@ -229,21 +239,11 @@ pub fn crank_swap_handler(mut ctx: Context<CrankSwap>, mut escrow_bump: u8) -> R
 
     require!(
         offered_holder_token_account.owner == final_requested_token_account.owner,
-        ProgramError::E007
+        ProgramError::E009
     );
 
     require!(
         requested_holder_token_account.owner == final_offered_token_account.owner,
-        ProgramError::E007
-    );
-
-    require!(
-        escrow.requested_token_account_pubkey == requested_holder_token_account.key(),
-        ProgramError::E008
-    );
-
-    require!(
-        escrow.offered_token_account_pubkey == offered_holder_token_account.key(),
         ProgramError::E009
     );
 
@@ -480,13 +480,13 @@ pub enum ProgramError {
     E004,
     #[msg("The escrow account does not match the given account.")]
     E005,
-    #[msg("This swap escrow was not requested to you.")]
+    #[msg("the given new_offered_token_account is now owned by the escrow")]
     E006,
-    #[msg("there is a mismatch in where the token should go")]
+    #[msg("This swap escrow was not requested to you.")]
     E007,
-    #[msg("the escrow account does not match the requested token account.")]
+    #[msg("The given new_requested_token_account is not owned by the escrow")]
     E008,
-    #[msg("the escrow account does not match the given account.")]
+    #[msg("there is a mismatch in where the token should go")]
     E009,
     #[msg("the destination token account is now owned by the requested authority")]
     E010,

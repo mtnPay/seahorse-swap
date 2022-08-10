@@ -8,11 +8,17 @@ declare_id('Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS')
 
 
 class Escrow(Account):
+    # pubkey of the wallet offering the swap
     offered_pubkey: Pubkey
+    # pubkey of the wallet who is being requested to swap
     requested_pubkey: Pubkey
+    # mint of the token being offered
     offered_token_mint_pubkey: Pubkey
+    # mint of the token being requested
     requested_token_mint_pubkey: Pubkey
+    # token account of the token being offered
     offered_token_account_pubkey: Pubkey
+    # token account of the token being requested
     requested_token_account_pubkey: Pubkey
 
 
@@ -45,6 +51,7 @@ def init_escrow(
             requested_holder_token_account
         ]
     )
+
     escrow.offered_pubkey = offerer_signer.key()
     escrow.requested_pubkey = requested_pubkey
 
@@ -93,6 +100,9 @@ def fund_offered_escrow(
 
     assert escrow.offered_token_account_pubkey == new_offered_token_account.key(
     ), 'The escrow account does not match the given account.'
+
+    assert new_offered_token_account.authority() == escrow.key(
+    ), 'the given new_offered_token_account is now owned by the escrow'
 
     offered_holder_token_account.transfer(
         offerer_signer,
@@ -143,6 +153,9 @@ def fund_requested_escrow(
 
     assert escrow.requested_token_account_pubkey == new_requested_token_account.key(
     ), 'The escrow account does not match the given account.'
+
+    assert new_requested_token_account.authority() == escrow.key(
+    ), 'The given new_requested_token_account is not owned by the escrow'
 
     requested_holder_token_account.transfer(
         requested_signer,
@@ -207,12 +220,6 @@ def crank_swap(
 
     assert requested_holder_token_account.authority() == final_offered_token_account.authority(
     ), 'there is a mismatch in where the token should go'
-
-    assert escrow.requested_token_account_pubkey == requested_holder_token_account.key(
-    ), 'the escrow account does not match the requested token account.'
-
-    assert escrow.offered_token_account_pubkey == offered_holder_token_account.key(
-    ), 'the escrow account does not match the given account.'
 
     assert final_offered_token_account.authority(
     ) == escrow.requested_pubkey, 'the destination token account is now owned by the requested authority'
