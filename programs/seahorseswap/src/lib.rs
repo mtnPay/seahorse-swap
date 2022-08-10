@@ -117,27 +117,27 @@ pub fn defund_escrow_offering_token_account_handler(
 
     require!(
         offering_signer.key() == escrow.offering_wallet_pubkey,
-        ProgramError::E004
-    );
-
-    require!(
-        escrow.offering_token_account_pubkey == escrow_offering_token_account.key(),
-        ProgramError::E005
-    );
-
-    require!(
-        escrow.requesting_token_account_pubkey == original_requesting_token_account.key(),
-        ProgramError::E005
-    );
-
-    require!(
-        original_requesting_token_account.owner == escrow.requesting_wallet_pubkey,
         ProgramError::E007
     );
 
     require!(
-        original_offering_token_account.owner == escrow.offering_wallet_pubkey,
+        escrow.offering_token_account_pubkey == escrow_offering_token_account.key(),
         ProgramError::E008
+    );
+
+    require!(
+        escrow.requesting_token_account_pubkey == original_requesting_token_account.key(),
+        ProgramError::E009
+    );
+
+    require!(
+        original_requesting_token_account.owner == escrow.requesting_wallet_pubkey,
+        ProgramError::E010
+    );
+
+    require!(
+        original_offering_token_account.owner == escrow.offering_wallet_pubkey,
+        ProgramError::E011
     );
 
     token::transfer(
@@ -171,17 +171,17 @@ pub fn fund_escrow_requesting_token_account_handler(
 
     require!(
         escrow.requesting_wallet_pubkey == requesting_signer.key(),
-        ProgramError::E009
+        ProgramError::E012
     );
 
     require!(
         escrow.requesting_token_account_pubkey == escrow_requesting_token_account.key(),
-        ProgramError::E005
+        ProgramError::E013
     );
 
     require!(
         escrow_requesting_token_account.owner == escrow.key(),
-        ProgramError::E010
+        ProgramError::E014
     );
 
     token::transfer(
@@ -211,27 +211,27 @@ pub fn defund_escrow_requesting_token_account_handler(
 
     require!(
         escrow.requesting_wallet_pubkey == requesting_signer.key(),
-        ProgramError::E009
+        ProgramError::E015
     );
 
     require!(
         escrow.requesting_token_account_pubkey == original_requesting_token_account.key(),
-        ProgramError::E005
+        ProgramError::E009
     );
 
     require!(
         escrow.offering_token_account_pubkey == original_offering_token_account.key(),
-        ProgramError::E005
+        ProgramError::E008
     );
 
     require!(
         original_requesting_token_account.owner == escrow.requesting_wallet_pubkey,
-        ProgramError::E007
+        ProgramError::E010
     );
 
     require!(
         original_offering_token_account.owner == escrow.offering_wallet_pubkey,
-        ProgramError::E008
+        ProgramError::E011
     );
 
     token::transfer(
@@ -266,32 +266,32 @@ pub fn crank_swap_handler(mut ctx: Context<CrankSwap>, mut escrow_bump: u8) -> R
 
     require!(
         original_offering_token_account.owner == final_requesting_token_account.owner,
-        ProgramError::E011
+        ProgramError::E016
     );
 
     require!(
         original_requesting_token_account.owner == final_offering_token_account.owner,
-        ProgramError::E011
+        ProgramError::E017
     );
 
     require!(
         final_offering_token_account.owner == escrow.requesting_wallet_pubkey,
-        ProgramError::E012
+        ProgramError::E018
     );
 
     require!(
         final_requesting_token_account.owner == escrow.offering_wallet_pubkey,
-        ProgramError::E013
+        ProgramError::E019
     );
 
     require!(
         escrow_offering_token_account.amount == (1 as u64),
-        ProgramError::E014
+        ProgramError::E020
     );
 
     require!(
         escrow_requesting_token_account.amount == (1 as u64),
-        ProgramError::E015
+        ProgramError::E021
     );
 
     token::transfer(
@@ -502,36 +502,50 @@ pub mod seahorseswap {
 
 #[error_code]
 pub enum ProgramError {
-    #[msg("mismatch in token auth + signers")]
+    # [msg ("The offering signing pubkey does not match the authority found on the given offering token account")]
     E000,
-    #[msg("mismatch in token auth + requested pubkey")]
+    # [msg ("The requesting pubkey does not match the authority found on the given requesting token account")]
     E001,
-    #[msg("the supply must equal 1 for the offered token")]
+    #[msg("The given offering token account supply must be equal to 1")]
     E002,
-    #[msg("the supply must equal 1 for the requested token")]
+    #[msg("The given requesting token account supply must be equal to 1")]
     E003,
-    #[msg("This swap escrow was not iniated by you.")]
+    # [msg ("The offering signer pubkey did not match the offering wallet pubkey found on the given escrow")]
     E004,
-    #[msg("The escrow account does not match the given account.")]
+    # [msg ("The given escrow offering token account did not match the pubkey found on the given escrow")]
     E005,
-    #[msg("the given escrow_offering_token_account is now owned by the escrow")]
+    # [msg ("The authority found on the given escrow offering token account did not match the pubkey from the given escrow")]
     E006,
-    #[msg("The escrow requested pubkey does not match the authority for the given token account")]
+    #[msg(
+        "The offering signer pubkey did not match the offering wallet pubkey on the given escrow"
+    )]
     E007,
-    #[msg("The escrow offered pubkey does not match the authority for the given token account")]
+    # [msg ("The pubkey on the given escrow offering token account did not match the offering token account pubkey on the given escrow")]
     E008,
-    #[msg("This swap escrow was not requested to you.")]
+    # [msg ("The pubkey on the given escrow requesting token account did not match the requesting token account pubkey on the given escrow")]
     E009,
-    #[msg("The given escrow_requesting_token_account is not owned by the escrow")]
+    # [msg ("The authority on the given original reqesting token account did not match the requesting wallet pubkey found on the given escrow")]
     E010,
-    #[msg("there is a mismatch in where the token should go")]
+    # [msg ("The authority on the given original offering token account did not match the offering wallet pubkey found on the given escrow")]
     E011,
-    #[msg("the destination token account is now owned by the requested authority")]
+    # [msg ("The requesting signer pubkey did not match the requesting wallet pubkey found on the given escrow")]
     E012,
-    #[msg("the destination token account is now owned by the offering authority")]
+    # [msg ("The given escrow requesting token account did not match the pubkey found on the given escrow")]
     E013,
-    #[msg("the escrow account does not have the offered token")]
+    # [msg ("The authority found on the given escrow requesting token account did not match the pubkey from the given escrow")]
     E014,
-    #[msg("the escrow account does not have the requested token")]
+    # [msg ("The requesting signer pubkey did not match the requesting wallet pubkey on the given escrow")]
     E015,
+    # [msg ("The authority on the original offering token account did not match the authoity on the final requesting token account")]
+    E016,
+    # [msg ("The authority on the requesting token account did not match the authority on the final offering token account")]
+    E017,
+    # [msg ("The authority on the final offering token account did not match the requesting wallet pubkey found on the given escrow")]
+    E018,
+    # [msg ("The authority on the final requesting token account did not match the offering wallet pubkey from the given escrow")]
+    E019,
+    #[msg("The amount of tokens in the escrow offering token account should equal 1")]
+    E020,
+    #[msg("The amount of tokens in the escrow requesting token account should equal 1")]
+    E021,
 }
