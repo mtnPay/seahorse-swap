@@ -9,7 +9,7 @@ import {
 
 const LAMPORTS_PER_SOL = 1_000_000_00
 
-describe("seahorseswap", () => {
+describe("seahorse-swap tests", () => {
     anchor.setProvider(anchor.AnchorProvider.env())
 
     const program = anchor.workspace.Seahorseswap as Program<Seahorseswap>
