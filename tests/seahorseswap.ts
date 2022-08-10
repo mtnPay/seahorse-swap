@@ -8,7 +8,6 @@ import {
     createInitializeMintInstruction,
     createMintToInstruction,
 } from "@solana/spl-token"
-import { min } from "bn.js"
 
 describe("seahorseswap", () => {
     // Configure the client to use the local cluster.
