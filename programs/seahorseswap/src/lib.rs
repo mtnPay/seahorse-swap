@@ -44,6 +44,26 @@ pub fn init_escrow_handler(
 
     escrow.requested_token_account_pubkey = new_requested_token_account.key();
 
+    require!(
+        offerer_signer.key() == offered_holder_token_account.owner,
+        ProgramError::E000
+    );
+
+    require!(
+        requested_pubkey == requested_holder_token_account.owner,
+        ProgramError::E001
+    );
+
+    require!(
+        offered_holder_token_account.amount == (1 as u64),
+        ProgramError::E002
+    );
+
+    require!(
+        requested_holder_token_account.amount == (1 as u64),
+        ProgramError::E003
+    );
+
     Ok(())
 }
 
@@ -55,12 +75,12 @@ pub fn fund_offered_escrow_handler(mut ctx: Context<FundOfferedEscrow>) -> Resul
 
     require!(
         escrow.offered_pubkey == offerer_signer.key(),
-        ProgramError::E000
+        ProgramError::E004
     );
 
     require!(
         escrow.offered_token_account_pubkey == new_offered_token_account.key(),
-        ProgramError::E001
+        ProgramError::E005
     );
 
     token::transfer(
@@ -90,12 +110,12 @@ pub fn defund_offered_escrow_handler(
 
     require!(
         offered_signer.key() == escrow.offered_pubkey,
-        ProgramError::E000
+        ProgramError::E004
     );
 
     require!(
         escrow.offered_token_account_pubkey == new_offered_token_account.key(),
-        ProgramError::E001
+        ProgramError::E005
     );
 
     token::transfer(
@@ -127,12 +147,12 @@ pub fn fund_requested_escrow_handler(mut ctx: Context<FundRequestedEscrow>) -> R
 
     require!(
         escrow.requested_pubkey == requested_signer.key(),
-        ProgramError::E002
+        ProgramError::E006
     );
 
     require!(
         escrow.requested_token_account_pubkey == new_requested_token_account.key(),
-        ProgramError::E001
+        ProgramError::E005
     );
 
     token::transfer(
@@ -160,14 +180,21 @@ pub fn defund_requested_escrow_handler(
     let mut requested_holder_token_account = &mut ctx.accounts.requested_holder_token_account;
     let mut new_requested_token_account = &mut ctx.accounts.new_requested_token_account;
 
+    "\n    - Tests to write\n    1. The requsted signer is the same as the requested pubkey on the escrow contract\n    2. The given requested token account pubkey matched the requested token escrow account pubkey \n    3. The given offered_holder_token_account authority matches the escrow's offered pubkey\n    4. The given requested_holder_token_account authiority matches the escrow's requested pubkey\n    " ;
+
     require!(
         escrow.requested_pubkey == requested_signer.key(),
-        ProgramError::E002
+        ProgramError::E006
     );
 
     require!(
-        escrow.requested_token_account_pubkey == new_requested_token_account.key(),
-        ProgramError::E001
+        escrow.requested_token_account_pubkey == requested_holder_token_account.key(),
+        ProgramError::E005
+    );
+
+    require!(
+        escrow.offered_token_account_pubkey == offered_holder_token_account.key(),
+        ProgramError::E005
     );
 
     token::transfer(
@@ -201,23 +228,43 @@ pub fn crank_swap_handler(mut ctx: Context<CrankSwap>, mut escrow_bump: u8) -> R
     let mut final_requested_token_account = &mut ctx.accounts.final_requested_token_account;
 
     require!(
-        escrow.requested_token_account_pubkey == new_requested_token_account.key(),
-        ProgramError::E001
+        offered_holder_token_account.owner == final_requested_token_account.owner,
+        ProgramError::E007
     );
 
     require!(
-        escrow.offered_token_account_pubkey == new_offered_token_account.key(),
-        ProgramError::E001
+        requested_holder_token_account.owner == final_offered_token_account.owner,
+        ProgramError::E007
+    );
+
+    require!(
+        escrow.requested_token_account_pubkey == requested_holder_token_account.key(),
+        ProgramError::E008
+    );
+
+    require!(
+        escrow.offered_token_account_pubkey == offered_holder_token_account.key(),
+        ProgramError::E009
     );
 
     require!(
         final_offered_token_account.owner == escrow.requested_pubkey,
-        ProgramError::E003
+        ProgramError::E010
     );
 
     require!(
         final_requested_token_account.owner == escrow.offered_pubkey,
-        ProgramError::E004
+        ProgramError::E011
+    );
+
+    require!(
+        new_offered_token_account.amount == (1 as u64),
+        ProgramError::E012
+    );
+
+    require!(
+        new_requested_token_account.amount == (1 as u64),
+        ProgramError::E013
     );
 
     token::transfer(
@@ -421,14 +468,32 @@ pub mod seahorseswap {
 
 #[error_code]
 pub enum ProgramError {
-    #[msg("This swap escrow was not iniated by you.")]
+    #[msg("mismatch in token auth + signers")]
     E000,
-    #[msg("The escrow account does not match the given account.")]
+    #[msg("mismatch in token auth + requested pubkey")]
     E001,
-    #[msg("This swap escrow was not requested to you.")]
+    #[msg("the supply must equal 1 for the offered token")]
     E002,
-    #[msg("the destination token account is now owned by the requested authority")]
+    #[msg("the supply must equal 1 for the requested token")]
     E003,
-    #[msg("the destination token account is now owned by the offering authority")]
+    #[msg("This swap escrow was not iniated by you.")]
     E004,
+    #[msg("The escrow account does not match the given account.")]
+    E005,
+    #[msg("This swap escrow was not requested to you.")]
+    E006,
+    #[msg("there is a mismatch in where the token should go")]
+    E007,
+    #[msg("the escrow account does not match the requested token account.")]
+    E008,
+    #[msg("the escrow account does not match the given account.")]
+    E009,
+    #[msg("the destination token account is now owned by the requested authority")]
+    E010,
+    #[msg("the destination token account is now owned by the offering authority")]
+    E011,
+    #[msg("the escrow account does not have the offered token")]
+    E012,
+    #[msg("the escrow account does not have the requested token")]
+    E013,
 }

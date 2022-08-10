@@ -37,7 +37,6 @@ def init_escrow(
     # # the new account that the requested token will be escrowed into
     new_requested_token_account: Empty[TokenAccount],
 ):
-
     escrow = escrow.init(
         payer=offerer_signer,
         seeds=[
@@ -69,6 +68,16 @@ def init_escrow(
 
     escrow.offered_token_account_pubkey = new_offered_token_account.key()
     escrow.requested_token_account_pubkey = new_requested_token_account.key()
+
+    assert offerer_signer.key() == offered_holder_token_account.authority(
+    ), 'mismatch in token auth + signers'
+
+    assert requested_pubkey == requested_holder_token_account.authority(
+    ), 'mismatch in token auth + requested pubkey'
+
+    assert offered_holder_token_account.amount == 1, 'the supply must equal 1 for the offered token'
+
+    assert requested_holder_token_account.amount == 1, 'the supply must equal 1 for the requested token'
 
 
 @instruction
@@ -151,11 +160,21 @@ def defund_requested_escrow(
     requested_holder_token_account: TokenAccount,
     new_requested_token_account: TokenAccount
 ):
+    '''
+    - Tests to write
+    1. The requsted signer is the same as the requested pubkey on the escrow contract
+    2. The given requested token account pubkey matched the requested token escrow account pubkey 
+    3. The given offered_holder_token_account authority matches the escrow's offered pubkey
+    4. The given requested_holder_token_account authiority matches the escrow's requested pubkey
+    '''
 
     assert escrow.requested_pubkey == requested_signer.key(
     ), 'This swap escrow was not requested to you.'
 
-    assert escrow.requested_token_account_pubkey == new_requested_token_account.key(
+    assert escrow.requested_token_account_pubkey == requested_holder_token_account.key(
+    ), 'The escrow account does not match the given account.'
+
+    assert escrow.offered_token_account_pubkey == offered_holder_token_account.key(
     ), 'The escrow account does not match the given account.'
 
     new_requested_token_account.transfer(
@@ -183,11 +202,17 @@ def crank_swap(
     final_requested_token_account: TokenAccount
 ):
 
-    assert escrow.requested_token_account_pubkey == new_requested_token_account.key(
-    ), 'The escrow account does not match the given account.'
+    assert offered_holder_token_account.authority() == final_requested_token_account.authority(
+    ), 'there is a mismatch in where the token should go'
 
-    assert escrow.offered_token_account_pubkey == new_offered_token_account.key(
-    ), 'The escrow account does not match the given account.'
+    assert requested_holder_token_account.authority() == final_offered_token_account.authority(
+    ), 'there is a mismatch in where the token should go'
+
+    assert escrow.requested_token_account_pubkey == requested_holder_token_account.key(
+    ), 'the escrow account does not match the requested token account.'
+
+    assert escrow.offered_token_account_pubkey == offered_holder_token_account.key(
+    ), 'the escrow account does not match the given account.'
 
     assert final_offered_token_account.authority(
     ) == escrow.requested_pubkey, 'the destination token account is now owned by the requested authority'
@@ -195,9 +220,13 @@ def crank_swap(
     assert final_requested_token_account.authority(
     ) == escrow.offered_pubkey, 'the destination token account is now owned by the offering authority'
 
+    assert new_offered_token_account.amount == 1, 'the escrow account does not have the offered token'
+
+    assert new_requested_token_account.amount == 1, 'the escrow account does not have the requested token'
+
     new_requested_token_account.transfer(
         escrow,
-        final_requested_token_account,  # need to make an account for the offerer
+        final_requested_token_account,
         u64(1),
         [
             'escrow',
@@ -209,7 +238,7 @@ def crank_swap(
 
     new_offered_token_account.transfer(
         escrow,
-        final_offered_token_account,  # need to make an account for the offerer
+        final_offered_token_account,
         u64(1),
         [
             'escrow',
