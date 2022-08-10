@@ -9,6 +9,8 @@ import {
     createMintToInstruction,
 } from "@solana/spl-token"
 
+const LAMPORTS_PER_SOL = 1_000_000_00
+
 describe("seahorseswap", () => {
     // Configure the client to use the local cluster.
     anchor.setProvider(anchor.AnchorProvider.env())
@@ -31,19 +33,19 @@ describe("seahorseswap", () => {
     let requestedEscrowTokenAccount: anchor.web3.PublicKey
 
     it("request airdrops", async () => {
-        const atx = await program.provider.connection.requestAirdrop(
+        const aliceAirdropTx = await program.provider.connection.requestAirdrop(
             alice.publicKey,
-            10000000000
+            LAMPORTS_PER_SOL
         )
 
-        await program.provider.connection.confirmTransaction(atx)
+        await program.provider.connection.confirmTransaction(aliceAirdropTx)
 
-        const btx = await program.provider.connection.requestAirdrop(
+        const bobAirdropTx = await program.provider.connection.requestAirdrop(
             bob.publicKey,
-            10000000000
+            LAMPORTS_PER_SOL
         )
 
-        await program.provider.connection.confirmTransaction(btx)
+        await program.provider.connection.confirmTransaction(bobAirdropTx)
     })
 
     it("mint NFT for alice", async () => {
