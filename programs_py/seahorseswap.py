@@ -105,12 +105,6 @@ def defund_escrow_offering_token_account(
     assert offering_signer.key(
     ) == escrow.offering_wallet_pubkey, 'The offering signer pubkey did not match the offering wallet pubkey on the given escrow'
 
-    assert escrow.offering_token_account_pubkey == escrow_offering_token_account.key(
-    ), 'The pubkey on the given escrow offering token account did not match the offering token account pubkey on the given escrow'
-
-    assert escrow.requesting_token_account_pubkey == original_requesting_token_account.key(
-    ), 'The pubkey on the given escrow requesting token account did not match the requesting token account pubkey on the given escrow'
-
     assert original_requesting_token_account.authority(
     ) == escrow.requesting_wallet_pubkey, 'The authority on the given original reqesting token account did not match the requesting wallet pubkey found on the given escrow'
 
@@ -166,12 +160,6 @@ def defund_escrow_requesting_token_account(
 
     assert escrow.requesting_wallet_pubkey == requesting_signer.key(
     ), 'The requesting signer pubkey did not match the requesting wallet pubkey on the given escrow'
-
-    assert escrow.requesting_token_account_pubkey == original_requesting_token_account.key(
-    ), 'The pubkey on the given escrow requesting token account did not match the requesting token account pubkey on the given escrow'
-
-    assert escrow.offering_token_account_pubkey == original_offering_token_account.key(
-    ), 'The pubkey on the given escrow offering token account did not match the offering token account pubkey on the given escrow'
 
     assert original_requesting_token_account.authority(
     ) == escrow.requesting_wallet_pubkey, 'The authority on the given original reqesting token account did not match the requesting wallet pubkey found on the given escrow'
