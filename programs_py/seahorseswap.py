@@ -8,202 +8,185 @@ declare_id('Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS')
 
 
 class Escrow(Account):
-    # pubkey of the wallet offering the swap
-    offered_pubkey: Pubkey
-    # pubkey of the wallet who is being requested to swap
-    requested_pubkey: Pubkey
-    # mint of the token being offered
-    offered_token_mint_pubkey: Pubkey
-    # mint of the token being requested
-    requested_token_mint_pubkey: Pubkey
-    # token account of the token being offered
-    offered_token_account_pubkey: Pubkey
-    # token account of the token being requested
-    requested_token_account_pubkey: Pubkey
+    offering_wallet_pubkey: Pubkey
+    requesting_wallet_pubkey: Pubkey
+    offering_token_mint_pubkey: Pubkey
+    requesting_token_mint_pubkey: Pubkey
+    offering_token_account_pubkey: Pubkey
+    requesting_token_account_pubkey: Pubkey
 
 
 @instruction
 def init_escrow(
-    # the initiater of the swap
-    offerer_signer: Signer,
-    # the pubkey of the wallet that the iniater wants to swap with
-    requested_pubkey: Pubkey,
-    # the token that the initiater wants to give
-    offered_token_mint: TokenMint,
-    # the token that the initiater wants to receive
-    requested_token_mint: TokenMint,
-    # the token account that currently holds the token the initiater wants to give
-    offered_holder_token_account: TokenAccount,
-    # the token account that currently holds the token the initiater wants to receive
-    requested_holder_token_account: TokenAccount,
-    # the account that the escrow will be initiated to
+    offering_signer: Signer,
+    requesting_wallet_pubkey: Pubkey,
+    offering_token_mint: TokenMint,
+    requesting_token_mint: TokenMint,
+    original_offering_token_account: TokenAccount,
+    original_requesting_token_account: TokenAccount,
     escrow: Empty[Escrow],
-    # the new account that the offered token will be escrowed into
-    new_offered_token_account: Empty[TokenAccount],
-    # # the new account that the requested token will be escrowed into
-    new_requested_token_account: Empty[TokenAccount],
+    escrow_offering_token_account: Empty[TokenAccount],
+    escrow_requesting_token_account: Empty[TokenAccount],
 ):
     escrow = escrow.init(
-        payer=offerer_signer,
+        payer=offering_signer,
         seeds=[
             'escrow',
-            offered_holder_token_account,
-            requested_holder_token_account
+            original_offering_token_account,
+            original_requesting_token_account
         ]
     )
 
-    escrow.offered_pubkey = offerer_signer.key()
-    escrow.requested_pubkey = requested_pubkey
+    escrow.offering_wallet_pubkey = offering_signer.key()
+    escrow.requesting_wallet_pubkey = requesting_wallet_pubkey
 
-    new_offered_token_account = new_offered_token_account.init(
-        payer=offerer_signer,
-        seeds=['escrow-offered-token-account', offered_holder_token_account],
-        mint=offered_token_mint,
+    escrow_offering_token_account = escrow_offering_token_account.init(
+        payer=offering_signer,
+        seeds=['escrow-offered-token-account',
+               original_offering_token_account],
+        mint=offering_token_mint,
         authority=escrow
     )
 
-    new_requested_token_account.init(
-        payer=offerer_signer,
+    escrow_requesting_token_account.init(
+        payer=offering_signer,
         seeds=['escrow-requested-token-account',
-               requested_holder_token_account],
-        mint=requested_token_mint,
+               original_requesting_token_account],
+        mint=requesting_token_mint,
         authority=escrow
     )
 
-    escrow.offered_token_mint_pubkey = offered_token_mint.key()
-    escrow.requested_token_mint_pubkey = requested_token_mint.key()
+    escrow.offering_token_mint_pubkey = offering_token_mint.key()
+    escrow.requesting_token_mint_pubkey = requesting_token_mint.key()
 
-    escrow.offered_token_account_pubkey = new_offered_token_account.key()
-    escrow.requested_token_account_pubkey = new_requested_token_account.key()
+    escrow.offering_token_account_pubkey = escrow_offering_token_account.key()
+    escrow.requesting_token_account_pubkey = escrow_requesting_token_account.key()
 
-    assert offerer_signer.key() == offered_holder_token_account.authority(
+    assert offering_signer.key() == original_offering_token_account.authority(
     ), 'mismatch in token auth + signers'
-
-    assert requested_pubkey == requested_holder_token_account.authority(
+    assert requesting_wallet_pubkey == original_requesting_token_account.authority(
     ), 'mismatch in token auth + requested pubkey'
-
-    assert offered_holder_token_account.amount == 1, 'the supply must equal 1 for the offered token'
-
-    assert requested_holder_token_account.amount == 1, 'the supply must equal 1 for the requested token'
+    assert original_offering_token_account.amount == 1, 'the supply must equal 1 for the offered token'
+    assert original_requesting_token_account.amount == 1, 'the supply must equal 1 for the requested token'
 
 
 @instruction
-def fund_offered_escrow(
-    offerer_signer: Signer,
+def fund_escrow_offering_token_account(
+    offering_signer: Signer,
     escrow: Escrow,
-    offered_holder_token_account: TokenAccount,
-    new_offered_token_account: TokenAccount
+    original_offering_token_account: TokenAccount,
+    escrow_offering_token_account: TokenAccount
 ):
 
-    assert escrow.offered_pubkey == offerer_signer.key(
+    assert escrow.offering_wallet_pubkey == offering_signer.key(
     ), 'This swap escrow was not iniated by you.'
-
-    assert escrow.offered_token_account_pubkey == new_offered_token_account.key(
+    assert escrow.offering_token_account_pubkey == escrow_offering_token_account.key(
     ), 'The escrow account does not match the given account.'
+    assert escrow_offering_token_account.authority() == escrow.key(
+    ), 'the given escrow_offering_token_account is now owned by the escrow'
 
-    assert new_offered_token_account.authority() == escrow.key(
-    ), 'the given new_offered_token_account is now owned by the escrow'
-
-    offered_holder_token_account.transfer(
-        offerer_signer,
-        new_offered_token_account,
+    original_offering_token_account.transfer(
+        offering_signer,
+        escrow_offering_token_account,
         u64(1)
     )
 
 
 @instruction
-def defund_offered_escrow(
-    offered_signer: Signer,
+def defund_escrow_offering_token_account(
+    offering_signer: Signer,
     escrow_bump: u8,
     escrow: Escrow,
-    offered_holder_token_account: TokenAccount,
-    requested_holder_token_account: TokenAccount,
-    new_offered_token_account: TokenAccount
+    original_offering_token_account: TokenAccount,
+    original_requesting_token_account: TokenAccount,
+    escrow_offering_token_account: TokenAccount
 ):
 
-    assert offered_signer.key(
-    ) == escrow.offered_pubkey, 'This swap escrow was not iniated by you.'
+    assert offering_signer.key(
+    ) == escrow.offering_wallet_pubkey, 'This swap escrow was not iniated by you.'
 
-    assert escrow.offered_token_account_pubkey == new_offered_token_account.key(
+    assert escrow.offering_token_account_pubkey == escrow_offering_token_account.key(
     ), 'The escrow account does not match the given account.'
 
-    new_offered_token_account.transfer(
+    assert escrow.requesting_token_account_pubkey == original_requesting_token_account.key(
+    ), 'The escrow account does not match the given account.'
+
+    assert original_requesting_token_account.authority(
+    ) == escrow.requesting_wallet_pubkey, 'The escrow requested pubkey does not match the authority for the given token account'
+
+    assert original_offering_token_account.authority(
+    ) == escrow.offering_wallet_pubkey, 'The escrow offered pubkey does not match the authority for the given token account'
+
+    escrow_offering_token_account.transfer(
         escrow,
-        offered_holder_token_account,
+        original_offering_token_account,
         u64(1),
         [
             'escrow',
-            offered_holder_token_account,
-            requested_holder_token_account,
+            original_offering_token_account,
+            original_requesting_token_account,
             escrow_bump
         ]
     )
 
 
 @instruction
-def fund_requested_escrow(
-    requested_signer: Signer,
+def fund_escrow_requesting_token_account(
+    requesting_signer: Signer,
     escrow: Escrow,
-    requested_holder_token_account: TokenAccount,
-    new_requested_token_account: TokenAccount
+    original_requesting_token_account: TokenAccount,
+    escrow_requesting_token_account: TokenAccount
 ):
 
-    assert escrow.requested_pubkey == requested_signer.key(
+    assert escrow.requesting_wallet_pubkey == requesting_signer.key(
     ), 'This swap escrow was not requested to you.'
 
-    assert escrow.requested_token_account_pubkey == new_requested_token_account.key(
+    assert escrow.requesting_token_account_pubkey == escrow_requesting_token_account.key(
     ), 'The escrow account does not match the given account.'
 
-    assert new_requested_token_account.authority() == escrow.key(
-    ), 'The given new_requested_token_account is not owned by the escrow'
+    assert escrow_requesting_token_account.authority() == escrow.key(
+    ), 'The given escrow_requesting_token_account is not owned by the escrow'
 
-    requested_holder_token_account.transfer(
-        requested_signer,
-        new_requested_token_account,
+    original_requesting_token_account.transfer(
+        requesting_signer,
+        escrow_requesting_token_account,
         u64(1)
     )
 
 
 @instruction
-def defund_requested_escrow(
-    requested_signer: Signer,
+def defund_escrow_requesting_token_account(
+    requesting_signer: Signer,
     escrow_bump: u8,
     escrow: Escrow,
-    offered_holder_token_account: TokenAccount,
-    requested_holder_token_account: TokenAccount,
-    new_requested_token_account: TokenAccount
+    original_offering_token_account: TokenAccount,
+    original_requesting_token_account: TokenAccount,
+    escrow_requesting_token_account: TokenAccount
 ):
-    '''
-    - Tests to write
-    1. The requsted signer is the same as the requested pubkey on the escrow contract
-    2. The given requested token account pubkey matched the requested token escrow account pubkey 
-    3. The given offered_holder_token_account authority matches the escrow's offered pubkey
-    4. The given requested_holder_token_account authiority matches the escrow's requested pubkey
-    '''
 
-    assert escrow.requested_pubkey == requested_signer.key(
+    assert escrow.requesting_wallet_pubkey == requesting_signer.key(
     ), 'This swap escrow was not requested to you.'
 
-    assert escrow.requested_token_account_pubkey == requested_holder_token_account.key(
+    assert escrow.requesting_token_account_pubkey == original_requesting_token_account.key(
     ), 'The escrow account does not match the given account.'
 
-    assert escrow.offered_token_account_pubkey == offered_holder_token_account.key(
+    assert escrow.offering_token_account_pubkey == original_offering_token_account.key(
     ), 'The escrow account does not match the given account.'
 
-    assert requested_holder_token_account.authority(
-    ) == escrow.requested_pubkey, 'The escrow requested pubkey does not match the authority for the given token account'
+    assert original_requesting_token_account.authority(
+    ) == escrow.requesting_wallet_pubkey, 'The escrow requested pubkey does not match the authority for the given token account'
 
-    assert offered_holder_token_account.authority(
-    ) == escrow.offered_pubkey, 'The escrow offered pubkey does not match the authority for the given token account'
+    assert original_offering_token_account.authority(
+    ) == escrow.offering_wallet_pubkey, 'The escrow offered pubkey does not match the authority for the given token account'
 
-    new_requested_token_account.transfer(
+    escrow_requesting_token_account.transfer(
         escrow,
-        requested_holder_token_account,
+        original_requesting_token_account,
         u64(1),
         [
             'escrow',
-            offered_holder_token_account,
-            requested_holder_token_account,
+            original_offering_token_account,
+            original_requesting_token_account,
             escrow_bump
         ]
     )
@@ -213,50 +196,50 @@ def defund_requested_escrow(
 def crank_swap(
     escrow_bump: u8,
     escrow: Escrow,
-    offered_holder_token_account: TokenAccount,
-    requested_holder_token_account: TokenAccount,
-    new_offered_token_account: TokenAccount,
-    new_requested_token_account: TokenAccount,
-    final_offered_token_account: TokenAccount,
-    final_requested_token_account: TokenAccount
+    original_offering_token_account: TokenAccount,
+    original_requesting_token_account: TokenAccount,
+    escrow_offering_token_account: TokenAccount,
+    escrow_requesting_token_account: TokenAccount,
+    final_offering_token_account: TokenAccount,
+    final_requesting_token_account: TokenAccount
 ):
 
-    assert offered_holder_token_account.authority() == final_requested_token_account.authority(
+    assert original_offering_token_account.authority() == final_requesting_token_account.authority(
     ), 'there is a mismatch in where the token should go'
 
-    assert requested_holder_token_account.authority() == final_offered_token_account.authority(
+    assert original_requesting_token_account.authority() == final_offering_token_account.authority(
     ), 'there is a mismatch in where the token should go'
 
-    assert final_offered_token_account.authority(
-    ) == escrow.requested_pubkey, 'the destination token account is now owned by the requested authority'
+    assert final_offering_token_account.authority(
+    ) == escrow.requesting_wallet_pubkey, 'the destination token account is now owned by the requested authority'
 
-    assert final_requested_token_account.authority(
-    ) == escrow.offered_pubkey, 'the destination token account is now owned by the offering authority'
+    assert final_requesting_token_account.authority(
+    ) == escrow.offering_wallet_pubkey, 'the destination token account is now owned by the offering authority'
 
-    assert new_offered_token_account.amount == 1, 'the escrow account does not have the offered token'
+    assert escrow_offering_token_account.amount == 1, 'the escrow account does not have the offered token'
 
-    assert new_requested_token_account.amount == 1, 'the escrow account does not have the requested token'
+    assert escrow_requesting_token_account.amount == 1, 'the escrow account does not have the requested token'
 
-    new_requested_token_account.transfer(
+    escrow_requesting_token_account.transfer(
         escrow,
-        final_requested_token_account,
+        final_requesting_token_account,
         u64(1),
         [
             'escrow',
-            offered_holder_token_account,
-            requested_holder_token_account,
+            original_offering_token_account,
+            original_requesting_token_account,
             escrow_bump
         ]
     )
 
-    new_offered_token_account.transfer(
+    escrow_offering_token_account.transfer(
         escrow,
-        final_offered_token_account,
+        final_offering_token_account,
         u64(1),
         [
             'escrow',
-            offered_holder_token_account,
-            requested_holder_token_account,
+            original_offering_token_account,
+            original_requesting_token_account,
             escrow_bump
         ]
     )

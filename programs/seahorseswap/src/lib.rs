@@ -8,83 +8,85 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 #[derive(Debug)]
 #[account]
 pub struct Escrow {
-    offered_pubkey: Pubkey,
-    requested_pubkey: Pubkey,
-    offered_token_mint_pubkey: Pubkey,
-    requested_token_mint_pubkey: Pubkey,
-    offered_token_account_pubkey: Pubkey,
-    requested_token_account_pubkey: Pubkey,
+    offering_wallet_pubkey: Pubkey,
+    requesting_wallet_pubkey: Pubkey,
+    offering_token_mint_pubkey: Pubkey,
+    requesting_token_mint_pubkey: Pubkey,
+    offering_token_account_pubkey: Pubkey,
+    requesting_token_account_pubkey: Pubkey,
 }
 
 pub fn init_escrow_handler(
     mut ctx: Context<InitEscrow>,
-    mut requested_pubkey: Pubkey,
+    mut requesting_wallet_pubkey: Pubkey,
 ) -> Result<()> {
-    let mut offerer_signer = &mut ctx.accounts.offerer_signer;
-    let mut offered_token_mint = &mut ctx.accounts.offered_token_mint;
-    let mut requested_token_mint = &mut ctx.accounts.requested_token_mint;
-    let mut offered_holder_token_account = &mut ctx.accounts.offered_holder_token_account;
-    let mut requested_holder_token_account = &mut ctx.accounts.requested_holder_token_account;
+    let mut offering_signer = &mut ctx.accounts.offering_signer;
+    let mut offering_token_mint = &mut ctx.accounts.offering_token_mint;
+    let mut requesting_token_mint = &mut ctx.accounts.requesting_token_mint;
+    let mut original_offering_token_account = &mut ctx.accounts.original_offering_token_account;
+    let mut original_requesting_token_account = &mut ctx.accounts.original_requesting_token_account;
     let mut escrow = &mut ctx.accounts.escrow;
-    let mut new_offered_token_account = &mut ctx.accounts.new_offered_token_account;
-    let mut new_requested_token_account = &mut ctx.accounts.new_requested_token_account;
+    let mut escrow_offering_token_account = &mut ctx.accounts.escrow_offering_token_account;
+    let mut escrow_requesting_token_account = &mut ctx.accounts.escrow_requesting_token_account;
     let mut escrow = escrow;
 
-    escrow.offered_pubkey = offerer_signer.key();
+    escrow.offering_wallet_pubkey = offering_signer.key();
 
-    escrow.requested_pubkey = requested_pubkey;
+    escrow.requesting_wallet_pubkey = requesting_wallet_pubkey;
 
-    let mut new_offered_token_account = new_offered_token_account;
+    let mut escrow_offering_token_account = escrow_offering_token_account;
 
-    escrow.offered_token_mint_pubkey = offered_token_mint.key();
+    escrow.offering_token_mint_pubkey = offering_token_mint.key();
 
-    escrow.requested_token_mint_pubkey = requested_token_mint.key();
+    escrow.requesting_token_mint_pubkey = requesting_token_mint.key();
 
-    escrow.offered_token_account_pubkey = new_offered_token_account.key();
+    escrow.offering_token_account_pubkey = escrow_offering_token_account.key();
 
-    escrow.requested_token_account_pubkey = new_requested_token_account.key();
+    escrow.requesting_token_account_pubkey = escrow_requesting_token_account.key();
 
     require!(
-        offerer_signer.key() == offered_holder_token_account.owner,
+        offering_signer.key() == original_offering_token_account.owner,
         ProgramError::E000
     );
 
     require!(
-        requested_pubkey == requested_holder_token_account.owner,
+        requesting_wallet_pubkey == original_requesting_token_account.owner,
         ProgramError::E001
     );
 
     require!(
-        offered_holder_token_account.amount == (1 as u64),
+        original_offering_token_account.amount == (1 as u64),
         ProgramError::E002
     );
 
     require!(
-        requested_holder_token_account.amount == (1 as u64),
+        original_requesting_token_account.amount == (1 as u64),
         ProgramError::E003
     );
 
     Ok(())
 }
 
-pub fn fund_offered_escrow_handler(mut ctx: Context<FundOfferedEscrow>) -> Result<()> {
-    let mut offerer_signer = &mut ctx.accounts.offerer_signer;
+pub fn fund_escrow_offering_token_account_handler(
+    mut ctx: Context<FundEscrowOfferingTokenAccount>,
+) -> Result<()> {
+    let mut offering_signer = &mut ctx.accounts.offering_signer;
     let mut escrow = &mut ctx.accounts.escrow;
-    let mut offered_holder_token_account = &mut ctx.accounts.offered_holder_token_account;
-    let mut new_offered_token_account = &mut ctx.accounts.new_offered_token_account;
+    let mut original_offering_token_account = &mut ctx.accounts.original_offering_token_account;
+    let mut escrow_offering_token_account = &mut ctx.accounts.escrow_offering_token_account;
 
     require!(
-        escrow.offered_pubkey == offerer_signer.key(),
+        escrow.offering_wallet_pubkey == offering_signer.key(),
         ProgramError::E004
     );
 
     require!(
-        escrow.offered_token_account_pubkey == new_offered_token_account.key(),
+        escrow.offering_token_account_pubkey == escrow_offering_token_account.key(),
         ProgramError::E005
     );
 
     require!(
-        new_offered_token_account.owner == escrow.key(),
+        escrow_offering_token_account.owner == escrow.key(),
         ProgramError::E006
     );
 
@@ -92,9 +94,9 @@ pub fn fund_offered_escrow_handler(mut ctx: Context<FundOfferedEscrow>) -> Resul
         CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
             token::Transfer {
-                from: offered_holder_token_account.to_account_info(),
-                authority: offerer_signer.to_account_info(),
-                to: new_offered_token_account.to_account_info(),
+                from: original_offering_token_account.to_account_info(),
+                authority: offering_signer.to_account_info(),
+                to: escrow_offering_token_account.to_account_info(),
             },
         ),
         1 as u64,
@@ -103,38 +105,53 @@ pub fn fund_offered_escrow_handler(mut ctx: Context<FundOfferedEscrow>) -> Resul
     Ok(())
 }
 
-pub fn defund_offered_escrow_handler(
-    mut ctx: Context<DefundOfferedEscrow>,
+pub fn defund_escrow_offering_token_account_handler(
+    mut ctx: Context<DefundEscrowOfferingTokenAccount>,
     mut escrow_bump: u8,
 ) -> Result<()> {
-    let mut offered_signer = &mut ctx.accounts.offered_signer;
+    let mut offering_signer = &mut ctx.accounts.offering_signer;
     let mut escrow = &mut ctx.accounts.escrow;
-    let mut offered_holder_token_account = &mut ctx.accounts.offered_holder_token_account;
-    let mut requested_holder_token_account = &mut ctx.accounts.requested_holder_token_account;
-    let mut new_offered_token_account = &mut ctx.accounts.new_offered_token_account;
+    let mut original_offering_token_account = &mut ctx.accounts.original_offering_token_account;
+    let mut original_requesting_token_account = &mut ctx.accounts.original_requesting_token_account;
+    let mut escrow_offering_token_account = &mut ctx.accounts.escrow_offering_token_account;
 
     require!(
-        offered_signer.key() == escrow.offered_pubkey,
+        offering_signer.key() == escrow.offering_wallet_pubkey,
         ProgramError::E004
     );
 
     require!(
-        escrow.offered_token_account_pubkey == new_offered_token_account.key(),
+        escrow.offering_token_account_pubkey == escrow_offering_token_account.key(),
         ProgramError::E005
+    );
+
+    require!(
+        escrow.requesting_token_account_pubkey == original_requesting_token_account.key(),
+        ProgramError::E005
+    );
+
+    require!(
+        original_requesting_token_account.owner == escrow.requesting_wallet_pubkey,
+        ProgramError::E007
+    );
+
+    require!(
+        original_offering_token_account.owner == escrow.offering_wallet_pubkey,
+        ProgramError::E008
     );
 
     token::transfer(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             token::Transfer {
-                from: new_offered_token_account.to_account_info(),
+                from: escrow_offering_token_account.to_account_info(),
                 authority: escrow.to_account_info(),
-                to: offered_holder_token_account.to_account_info(),
+                to: original_offering_token_account.to_account_info(),
             },
             &[&[
                 "escrow".as_bytes().as_ref(),
-                offered_holder_token_account.key().as_ref(),
-                requested_holder_token_account.key().as_ref(),
+                original_offering_token_account.key().as_ref(),
+                original_requesting_token_account.key().as_ref(),
                 escrow_bump.to_le_bytes().as_ref(),
             ]],
         ),
@@ -144,34 +161,36 @@ pub fn defund_offered_escrow_handler(
     Ok(())
 }
 
-pub fn fund_requested_escrow_handler(mut ctx: Context<FundRequestedEscrow>) -> Result<()> {
-    let mut requested_signer = &mut ctx.accounts.requested_signer;
+pub fn fund_escrow_requesting_token_account_handler(
+    mut ctx: Context<FundEscrowRequestingTokenAccount>,
+) -> Result<()> {
+    let mut requesting_signer = &mut ctx.accounts.requesting_signer;
     let mut escrow = &mut ctx.accounts.escrow;
-    let mut requested_holder_token_account = &mut ctx.accounts.requested_holder_token_account;
-    let mut new_requested_token_account = &mut ctx.accounts.new_requested_token_account;
+    let mut original_requesting_token_account = &mut ctx.accounts.original_requesting_token_account;
+    let mut escrow_requesting_token_account = &mut ctx.accounts.escrow_requesting_token_account;
 
     require!(
-        escrow.requested_pubkey == requested_signer.key(),
-        ProgramError::E007
+        escrow.requesting_wallet_pubkey == requesting_signer.key(),
+        ProgramError::E009
     );
 
     require!(
-        escrow.requested_token_account_pubkey == new_requested_token_account.key(),
+        escrow.requesting_token_account_pubkey == escrow_requesting_token_account.key(),
         ProgramError::E005
     );
 
     require!(
-        new_requested_token_account.owner == escrow.key(),
-        ProgramError::E008
+        escrow_requesting_token_account.owner == escrow.key(),
+        ProgramError::E010
     );
 
     token::transfer(
         CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
             token::Transfer {
-                from: requested_holder_token_account.to_account_info(),
-                authority: requested_signer.to_account_info(),
-                to: new_requested_token_account.to_account_info(),
+                from: original_requesting_token_account.to_account_info(),
+                authority: requesting_signer.to_account_info(),
+                to: escrow_requesting_token_account.to_account_info(),
             },
         ),
         1 as u64,
@@ -180,55 +199,53 @@ pub fn fund_requested_escrow_handler(mut ctx: Context<FundRequestedEscrow>) -> R
     Ok(())
 }
 
-pub fn defund_requested_escrow_handler(
-    mut ctx: Context<DefundRequestedEscrow>,
+pub fn defund_escrow_requesting_token_account_handler(
+    mut ctx: Context<DefundEscrowRequestingTokenAccount>,
     mut escrow_bump: u8,
 ) -> Result<()> {
-    let mut requested_signer = &mut ctx.accounts.requested_signer;
+    let mut requesting_signer = &mut ctx.accounts.requesting_signer;
     let mut escrow = &mut ctx.accounts.escrow;
-    let mut offered_holder_token_account = &mut ctx.accounts.offered_holder_token_account;
-    let mut requested_holder_token_account = &mut ctx.accounts.requested_holder_token_account;
-    let mut new_requested_token_account = &mut ctx.accounts.new_requested_token_account;
-
-    "\n    - Tests to write\n    1. The requsted signer is the same as the requested pubkey on the escrow contract\n    2. The given requested token account pubkey matched the requested token escrow account pubkey \n    3. The given offered_holder_token_account authority matches the escrow's offered pubkey\n    4. The given requested_holder_token_account authiority matches the escrow's requested pubkey\n    " ;
+    let mut original_offering_token_account = &mut ctx.accounts.original_offering_token_account;
+    let mut original_requesting_token_account = &mut ctx.accounts.original_requesting_token_account;
+    let mut escrow_requesting_token_account = &mut ctx.accounts.escrow_requesting_token_account;
 
     require!(
-        escrow.requested_pubkey == requested_signer.key(),
-        ProgramError::E007
-    );
-
-    require!(
-        escrow.requested_token_account_pubkey == requested_holder_token_account.key(),
-        ProgramError::E005
-    );
-
-    require!(
-        escrow.offered_token_account_pubkey == offered_holder_token_account.key(),
-        ProgramError::E005
-    );
-
-    require!(
-        requested_holder_token_account.owner == escrow.requested_pubkey,
+        escrow.requesting_wallet_pubkey == requesting_signer.key(),
         ProgramError::E009
     );
 
     require!(
-        offered_holder_token_account.owner == escrow.offered_pubkey,
-        ProgramError::E010
+        escrow.requesting_token_account_pubkey == original_requesting_token_account.key(),
+        ProgramError::E005
+    );
+
+    require!(
+        escrow.offering_token_account_pubkey == original_offering_token_account.key(),
+        ProgramError::E005
+    );
+
+    require!(
+        original_requesting_token_account.owner == escrow.requesting_wallet_pubkey,
+        ProgramError::E007
+    );
+
+    require!(
+        original_offering_token_account.owner == escrow.offering_wallet_pubkey,
+        ProgramError::E008
     );
 
     token::transfer(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             token::Transfer {
-                from: new_requested_token_account.to_account_info(),
+                from: escrow_requesting_token_account.to_account_info(),
                 authority: escrow.to_account_info(),
-                to: requested_holder_token_account.to_account_info(),
+                to: original_requesting_token_account.to_account_info(),
             },
             &[&[
                 "escrow".as_bytes().as_ref(),
-                offered_holder_token_account.key().as_ref(),
-                requested_holder_token_account.key().as_ref(),
+                original_offering_token_account.key().as_ref(),
+                original_requesting_token_account.key().as_ref(),
                 escrow_bump.to_le_bytes().as_ref(),
             ]],
         ),
@@ -240,40 +257,40 @@ pub fn defund_requested_escrow_handler(
 
 pub fn crank_swap_handler(mut ctx: Context<CrankSwap>, mut escrow_bump: u8) -> Result<()> {
     let mut escrow = &mut ctx.accounts.escrow;
-    let mut offered_holder_token_account = &mut ctx.accounts.offered_holder_token_account;
-    let mut requested_holder_token_account = &mut ctx.accounts.requested_holder_token_account;
-    let mut new_offered_token_account = &mut ctx.accounts.new_offered_token_account;
-    let mut new_requested_token_account = &mut ctx.accounts.new_requested_token_account;
-    let mut final_offered_token_account = &mut ctx.accounts.final_offered_token_account;
-    let mut final_requested_token_account = &mut ctx.accounts.final_requested_token_account;
+    let mut original_offering_token_account = &mut ctx.accounts.original_offering_token_account;
+    let mut original_requesting_token_account = &mut ctx.accounts.original_requesting_token_account;
+    let mut escrow_offering_token_account = &mut ctx.accounts.escrow_offering_token_account;
+    let mut escrow_requesting_token_account = &mut ctx.accounts.escrow_requesting_token_account;
+    let mut final_offering_token_account = &mut ctx.accounts.final_offering_token_account;
+    let mut final_requesting_token_account = &mut ctx.accounts.final_requesting_token_account;
 
     require!(
-        offered_holder_token_account.owner == final_requested_token_account.owner,
+        original_offering_token_account.owner == final_requesting_token_account.owner,
         ProgramError::E011
     );
 
     require!(
-        requested_holder_token_account.owner == final_offered_token_account.owner,
+        original_requesting_token_account.owner == final_offering_token_account.owner,
         ProgramError::E011
     );
 
     require!(
-        final_offered_token_account.owner == escrow.requested_pubkey,
+        final_offering_token_account.owner == escrow.requesting_wallet_pubkey,
         ProgramError::E012
     );
 
     require!(
-        final_requested_token_account.owner == escrow.offered_pubkey,
+        final_requesting_token_account.owner == escrow.offering_wallet_pubkey,
         ProgramError::E013
     );
 
     require!(
-        new_offered_token_account.amount == (1 as u64),
+        escrow_offering_token_account.amount == (1 as u64),
         ProgramError::E014
     );
 
     require!(
-        new_requested_token_account.amount == (1 as u64),
+        escrow_requesting_token_account.amount == (1 as u64),
         ProgramError::E015
     );
 
@@ -281,14 +298,14 @@ pub fn crank_swap_handler(mut ctx: Context<CrankSwap>, mut escrow_bump: u8) -> R
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             token::Transfer {
-                from: new_requested_token_account.to_account_info(),
+                from: escrow_requesting_token_account.to_account_info(),
                 authority: escrow.to_account_info(),
-                to: final_requested_token_account.to_account_info(),
+                to: final_requesting_token_account.to_account_info(),
             },
             &[&[
                 "escrow".as_bytes().as_ref(),
-                offered_holder_token_account.key().as_ref(),
-                requested_holder_token_account.key().as_ref(),
+                original_offering_token_account.key().as_ref(),
+                original_requesting_token_account.key().as_ref(),
                 escrow_bump.to_le_bytes().as_ref(),
             ]],
         ),
@@ -299,14 +316,14 @@ pub fn crank_swap_handler(mut ctx: Context<CrankSwap>, mut escrow_bump: u8) -> R
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             token::Transfer {
-                from: new_offered_token_account.to_account_info(),
+                from: escrow_offering_token_account.to_account_info(),
                 authority: escrow.to_account_info(),
-                to: final_offered_token_account.to_account_info(),
+                to: final_offering_token_account.to_account_info(),
             },
             &[&[
                 "escrow".as_bytes().as_ref(),
-                offered_holder_token_account.key().as_ref(),
-                requested_holder_token_account.key().as_ref(),
+                original_offering_token_account.key().as_ref(),
+                original_requesting_token_account.key().as_ref(),
                 escrow_bump.to_le_bytes().as_ref(),
             ]],
         ),
@@ -319,22 +336,22 @@ pub fn crank_swap_handler(mut ctx: Context<CrankSwap>, mut escrow_bump: u8) -> R
 #[derive(Accounts)]
 pub struct InitEscrow<'info> {
     #[account(mut)]
-    pub offerer_signer: Signer<'info>,
+    pub offering_signer: Signer<'info>,
     #[account(mut)]
-    pub offered_token_mint: Box<Account<'info, token::Mint>>,
+    pub offering_token_mint: Box<Account<'info, token::Mint>>,
     #[account(mut)]
-    pub requested_token_mint: Box<Account<'info, token::Mint>>,
+    pub requesting_token_mint: Box<Account<'info, token::Mint>>,
     #[account(mut)]
-    pub offered_holder_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub original_offering_token_account: Box<Account<'info, token::TokenAccount>>,
     #[account(mut)]
-    pub requested_holder_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub original_requesting_token_account: Box<Account<'info, token::TokenAccount>>,
     #[account(
         init,
-        payer = offerer_signer,
+        payer = offering_signer,
         seeds = [
             "escrow".as_bytes().as_ref(),
-            offered_holder_token_account.key().as_ref(),
-            requested_holder_token_account.key().as_ref()
+            original_offering_token_account.key().as_ref(),
+            original_requesting_token_account.key().as_ref()
         ],
         bump,
         space = 8 + std::mem::size_of::<Escrow>()
@@ -342,86 +359,86 @@ pub struct InitEscrow<'info> {
     pub escrow: Box<Account<'info, Escrow>>,
     #[account(
         init,
-        payer = offerer_signer,
+        payer = offering_signer,
         seeds = [
             "escrow-offered-token-account".as_bytes().as_ref(),
-            offered_holder_token_account.key().as_ref()
+            original_offering_token_account.key().as_ref()
         ],
         bump,
-        token::mint = offered_token_mint,
+        token::mint = offering_token_mint,
         token::authority = escrow
     )]
-    pub new_offered_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub escrow_offering_token_account: Box<Account<'info, token::TokenAccount>>,
     #[account(
         init,
-        payer = offerer_signer,
+        payer = offering_signer,
         seeds = [
             "escrow-requested-token-account".as_bytes().as_ref(),
-            requested_holder_token_account.key().as_ref()
+            original_requesting_token_account.key().as_ref()
         ],
         bump,
-        token::mint = requested_token_mint,
+        token::mint = requesting_token_mint,
         token::authority = escrow
     )]
-    pub new_requested_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub escrow_requesting_token_account: Box<Account<'info, token::TokenAccount>>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, token::Token>,
     pub rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]
-pub struct FundOfferedEscrow<'info> {
+pub struct FundEscrowOfferingTokenAccount<'info> {
     #[account(mut)]
-    pub offerer_signer: Signer<'info>,
+    pub offering_signer: Signer<'info>,
     #[account(mut)]
     pub escrow: Box<Account<'info, Escrow>>,
     #[account(mut)]
-    pub offered_holder_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub original_offering_token_account: Box<Account<'info, token::TokenAccount>>,
     #[account(mut)]
-    pub new_offered_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub escrow_offering_token_account: Box<Account<'info, token::TokenAccount>>,
     pub token_program: Program<'info, token::Token>,
 }
 
 #[derive(Accounts)]
-pub struct DefundOfferedEscrow<'info> {
+pub struct DefundEscrowOfferingTokenAccount<'info> {
     #[account(mut)]
-    pub offered_signer: Signer<'info>,
+    pub offering_signer: Signer<'info>,
     #[account(mut)]
     pub escrow: Box<Account<'info, Escrow>>,
     #[account(mut)]
-    pub offered_holder_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub original_offering_token_account: Box<Account<'info, token::TokenAccount>>,
     #[account(mut)]
-    pub requested_holder_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub original_requesting_token_account: Box<Account<'info, token::TokenAccount>>,
     #[account(mut)]
-    pub new_offered_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub escrow_offering_token_account: Box<Account<'info, token::TokenAccount>>,
     pub token_program: Program<'info, token::Token>,
 }
 
 #[derive(Accounts)]
-pub struct FundRequestedEscrow<'info> {
+pub struct FundEscrowRequestingTokenAccount<'info> {
     #[account(mut)]
-    pub requested_signer: Signer<'info>,
+    pub requesting_signer: Signer<'info>,
     #[account(mut)]
     pub escrow: Box<Account<'info, Escrow>>,
     #[account(mut)]
-    pub requested_holder_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub original_requesting_token_account: Box<Account<'info, token::TokenAccount>>,
     #[account(mut)]
-    pub new_requested_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub escrow_requesting_token_account: Box<Account<'info, token::TokenAccount>>,
     pub token_program: Program<'info, token::Token>,
 }
 
 #[derive(Accounts)]
-pub struct DefundRequestedEscrow<'info> {
+pub struct DefundEscrowRequestingTokenAccount<'info> {
     #[account(mut)]
-    pub requested_signer: Signer<'info>,
+    pub requesting_signer: Signer<'info>,
     #[account(mut)]
     pub escrow: Box<Account<'info, Escrow>>,
     #[account(mut)]
-    pub offered_holder_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub original_offering_token_account: Box<Account<'info, token::TokenAccount>>,
     #[account(mut)]
-    pub requested_holder_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub original_requesting_token_account: Box<Account<'info, token::TokenAccount>>,
     #[account(mut)]
-    pub new_requested_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub escrow_requesting_token_account: Box<Account<'info, token::TokenAccount>>,
     pub token_program: Program<'info, token::Token>,
 }
 
@@ -430,17 +447,17 @@ pub struct CrankSwap<'info> {
     #[account(mut)]
     pub escrow: Box<Account<'info, Escrow>>,
     #[account(mut)]
-    pub offered_holder_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub original_offering_token_account: Box<Account<'info, token::TokenAccount>>,
     #[account(mut)]
-    pub requested_holder_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub original_requesting_token_account: Box<Account<'info, token::TokenAccount>>,
     #[account(mut)]
-    pub new_offered_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub escrow_offering_token_account: Box<Account<'info, token::TokenAccount>>,
     #[account(mut)]
-    pub new_requested_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub escrow_requesting_token_account: Box<Account<'info, token::TokenAccount>>,
     #[account(mut)]
-    pub final_offered_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub final_offering_token_account: Box<Account<'info, token::TokenAccount>>,
     #[account(mut)]
-    pub final_requested_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub final_requesting_token_account: Box<Account<'info, token::TokenAccount>>,
     pub token_program: Program<'info, token::Token>,
 }
 
@@ -448,27 +465,34 @@ pub struct CrankSwap<'info> {
 pub mod seahorseswap {
     use super::*;
 
-    pub fn init_escrow(ctx: Context<InitEscrow>, requested_pubkey: Pubkey) -> Result<()> {
-        init_escrow_handler(ctx, requested_pubkey)
+    pub fn init_escrow(ctx: Context<InitEscrow>, requesting_wallet_pubkey: Pubkey) -> Result<()> {
+        init_escrow_handler(ctx, requesting_wallet_pubkey)
     }
 
-    pub fn fund_offered_escrow(ctx: Context<FundOfferedEscrow>) -> Result<()> {
-        fund_offered_escrow_handler(ctx)
+    pub fn fund_escrow_offering_token_account(
+        ctx: Context<FundEscrowOfferingTokenAccount>,
+    ) -> Result<()> {
+        fund_escrow_offering_token_account_handler(ctx)
     }
 
-    pub fn defund_offered_escrow(ctx: Context<DefundOfferedEscrow>, escrow_bump: u8) -> Result<()> {
-        defund_offered_escrow_handler(ctx, escrow_bump)
-    }
-
-    pub fn fund_requested_escrow(ctx: Context<FundRequestedEscrow>) -> Result<()> {
-        fund_requested_escrow_handler(ctx)
-    }
-
-    pub fn defund_requested_escrow(
-        ctx: Context<DefundRequestedEscrow>,
+    pub fn defund_escrow_offering_token_account(
+        ctx: Context<DefundEscrowOfferingTokenAccount>,
         escrow_bump: u8,
     ) -> Result<()> {
-        defund_requested_escrow_handler(ctx, escrow_bump)
+        defund_escrow_offering_token_account_handler(ctx, escrow_bump)
+    }
+
+    pub fn fund_escrow_requesting_token_account(
+        ctx: Context<FundEscrowRequestingTokenAccount>,
+    ) -> Result<()> {
+        fund_escrow_requesting_token_account_handler(ctx)
+    }
+
+    pub fn defund_escrow_requesting_token_account(
+        ctx: Context<DefundEscrowRequestingTokenAccount>,
+        escrow_bump: u8,
+    ) -> Result<()> {
+        defund_escrow_requesting_token_account_handler(ctx, escrow_bump)
     }
 
     pub fn crank_swap(ctx: Context<CrankSwap>, escrow_bump: u8) -> Result<()> {
@@ -490,15 +514,15 @@ pub enum ProgramError {
     E004,
     #[msg("The escrow account does not match the given account.")]
     E005,
-    #[msg("the given new_offered_token_account is now owned by the escrow")]
+    #[msg("the given escrow_offering_token_account is now owned by the escrow")]
     E006,
-    #[msg("This swap escrow was not requested to you.")]
-    E007,
-    #[msg("The given new_requested_token_account is not owned by the escrow")]
-    E008,
     #[msg("The escrow requested pubkey does not match the authority for the given token account")]
-    E009,
+    E007,
     #[msg("The escrow offered pubkey does not match the authority for the given token account")]
+    E008,
+    #[msg("This swap escrow was not requested to you.")]
+    E009,
+    #[msg("The given escrow_requesting_token_account is not owned by the escrow")]
     E010,
     #[msg("there is a mismatch in where the token should go")]
     E011,

@@ -96,13 +96,13 @@ describe("seahorseswap", () => {
         const ix = await program.methods
             .initEscrow(bob.publicKey)
             .accounts({
-                offererSigner: alice.publicKey,
-                offeredTokenMint: aliceMint,
-                requestedTokenMint: bobMint,
-                offeredHolderTokenAccount: aliceAta,
-                requestedHolderTokenAccount: bobAta,
-                newOfferedTokenAccount: offeredEscrowTokenAccount,
-                newRequestedTokenAccount: requestedEscrowTokenAccount,
+                offeringSigner: alice.publicKey,
+                offeringTokenMint: aliceMint,
+                requestingTokenMint: bobMint,
+                originalOfferingTokenAccount: aliceAta,
+                originalRequestingTokenAccount: bobAta,
+                escrowOfferingTokenAccount: offeredEscrowTokenAccount,
+                escrowRequestingTokenAccount: requestedEscrowTokenAccount,
                 escrow: escrow,
             })
             .instruction()
@@ -119,22 +119,15 @@ describe("seahorseswap", () => {
         ])
 
         await program.provider.connection.confirmTransaction(sig)
-
-        // const sss = await program.provider.connection.requestAirdrop(
-        //     escrow,
-        //     1000000000
-        // )
-
-        // await program.provider.connection.confirmTransaction(sss)
     })
 
     it("fund offered token", async () => {
         const ix = await program.methods
-            .fundOfferedEscrow()
+            .fundEscrowOfferingTokenAccount()
             .accounts({
-                offererSigner: alice.publicKey,
-                offeredHolderTokenAccount: aliceAta,
-                newOfferedTokenAccount: offeredEscrowTokenAccount,
+                offeringSigner: alice.publicKey,
+                originalOfferingTokenAccount: aliceAta,
+                escrowOfferingTokenAccount: offeredEscrowTokenAccount,
                 escrow: escrow,
             })
             .instruction()
@@ -155,11 +148,11 @@ describe("seahorseswap", () => {
 
     it("fund requested token", async () => {
         const ix = await program.methods
-            .fundRequestedEscrow()
+            .fundEscrowRequestingTokenAccount()
             .accounts({
-                requestedSigner: bob.publicKey,
-                requestedHolderTokenAccount: bobAta,
-                newRequestedTokenAccount: requestedEscrowTokenAccount,
+                requestingSigner: bob.publicKey,
+                originalRequestingTokenAccount: bobAta,
+                escrowRequestingTokenAccount: requestedEscrowTokenAccount,
                 escrow: escrow,
             })
             .instruction()
@@ -256,20 +249,14 @@ describe("seahorseswap", () => {
             .crankSwap(escrowBump)
             .accounts({
                 escrow: escrow,
-                offeredHolderTokenAccount: aliceAta,
-                requestedHolderTokenAccount: bobAta,
-                newOfferedTokenAccount: offeredEscrowTokenAccount,
-                newRequestedTokenAccount: requestedEscrowTokenAccount,
-                finalOfferedTokenAccount: finalBobAta,
-                finalRequestedTokenAccount: finalAliceAta,
+                originalOfferingTokenAccount: aliceAta,
+                originalRequestingTokenAccount: bobAta,
+                escrowOfferingTokenAccount: offeredEscrowTokenAccount,
+                escrowRequestingTokenAccount: requestedEscrowTokenAccount,
+                finalOfferingTokenAccount: finalBobAta,
+                finalRequestingTokenAccount: finalAliceAta,
             })
             .instruction()
-
-        // const escrowInfo = await program.provider.connection.getAccountInfo(
-        //     alice.publicKey
-        // )
-        // console.log("LAMPORTS")
-        // console.log(escrowInfo.lamports)
 
         const blockhash = await program.provider.connection.getLatestBlockhash()
         var tx = new anchor.web3.Transaction({
