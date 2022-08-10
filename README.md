@@ -1,5 +1,5 @@
 # seahorseswap
 
-This project was created by Seahorse 0.1.2.
+seahorse-swap is a solana smart contract that acts an escrow for swapping NFTs trustlessly. built entirly with [seahorse-lang](https://seahorse-lang.org)
 
-To get started, just add your code to **programs_py/seahorseswap.py** and run `seahorse build`.
+
