@@ -207,6 +207,16 @@ pub fn defund_requested_escrow_handler(
         ProgramError::E005
     );
 
+    require!(
+        requested_holder_token_account.owner == escrow.requested_pubkey,
+        ProgramError::E009
+    );
+
+    require!(
+        offered_holder_token_account.owner == escrow.offered_pubkey,
+        ProgramError::E010
+    );
+
     token::transfer(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
@@ -239,32 +249,32 @@ pub fn crank_swap_handler(mut ctx: Context<CrankSwap>, mut escrow_bump: u8) -> R
 
     require!(
         offered_holder_token_account.owner == final_requested_token_account.owner,
-        ProgramError::E009
-    );
-
-    require!(
-        requested_holder_token_account.owner == final_offered_token_account.owner,
-        ProgramError::E009
-    );
-
-    require!(
-        final_offered_token_account.owner == escrow.requested_pubkey,
-        ProgramError::E010
-    );
-
-    require!(
-        final_requested_token_account.owner == escrow.offered_pubkey,
         ProgramError::E011
     );
 
     require!(
-        new_offered_token_account.amount == (1 as u64),
+        requested_holder_token_account.owner == final_offered_token_account.owner,
+        ProgramError::E011
+    );
+
+    require!(
+        final_offered_token_account.owner == escrow.requested_pubkey,
         ProgramError::E012
     );
 
     require!(
-        new_requested_token_account.amount == (1 as u64),
+        final_requested_token_account.owner == escrow.offered_pubkey,
         ProgramError::E013
+    );
+
+    require!(
+        new_offered_token_account.amount == (1 as u64),
+        ProgramError::E014
+    );
+
+    require!(
+        new_requested_token_account.amount == (1 as u64),
+        ProgramError::E015
     );
 
     token::transfer(
@@ -486,14 +496,18 @@ pub enum ProgramError {
     E007,
     #[msg("The given new_requested_token_account is not owned by the escrow")]
     E008,
-    #[msg("there is a mismatch in where the token should go")]
+    #[msg("The escrow requested pubkey does not match the authority for the given token account")]
     E009,
-    #[msg("the destination token account is now owned by the requested authority")]
+    #[msg("The escrow offered pubkey does not match the authority for the given token account")]
     E010,
-    #[msg("the destination token account is now owned by the offering authority")]
+    #[msg("there is a mismatch in where the token should go")]
     E011,
-    #[msg("the escrow account does not have the offered token")]
+    #[msg("the destination token account is now owned by the requested authority")]
     E012,
-    #[msg("the escrow account does not have the requested token")]
+    #[msg("the destination token account is now owned by the offering authority")]
     E013,
+    #[msg("the escrow account does not have the offered token")]
+    E014,
+    #[msg("the escrow account does not have the requested token")]
+    E015,
 }

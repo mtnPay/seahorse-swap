@@ -190,6 +190,12 @@ def defund_requested_escrow(
     assert escrow.offered_token_account_pubkey == offered_holder_token_account.key(
     ), 'The escrow account does not match the given account.'
 
+    assert requested_holder_token_account.authority(
+    ) == escrow.requested_pubkey, 'The escrow requested pubkey does not match the authority for the given token account'
+
+    assert offered_holder_token_account.authority(
+    ) == escrow.offered_pubkey, 'The escrow offered pubkey does not match the authority for the given token account'
+
     new_requested_token_account.transfer(
         escrow,
         requested_holder_token_account,
